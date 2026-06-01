@@ -1,0 +1,11 @@
+jurisdictions:
+  - name: San Francisco
+    county: San Francisco
+    type: city
+    open_data_api: https://data.sfgov.org
+    permit_system: DataSF / DBI Permit Tracking System
+    procurement_portal: null
+    access: api
+    urls:
+      permits: https://data.sfgov.org/Housing-and-Buildings/Building-Permits/i98e-djp9
+      permit_contacts: https://data.sfgov.org/Housing-and-Buildings/Building-Permits-Contacts/3pee-9qhc

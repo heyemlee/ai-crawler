@@ -1,0 +1,79 @@
+sources:
+  datasf-building-permits:
+    type: socrata_building_permits
+    domain: data.sfgov.org
+    dataset_id: i98e-djp9
+    contacts_dataset_id: 3pee-9qhc
+    name: DataSF Building Permits
+    jurisdiction: San Francisco
+    county: San Francisco
+    access: api
+    date_field: data_loaded_at
+    page_size: 500
+    source_url_template: "https://data.sfgov.org/resource/i98e-djp9.json?permit_number={permit_number}"
+    # DataSF columns match SocrataFieldMap defaults; contacts come from the join above.
+
+  # Marin County (Socrata). County-level dataset: the contractor + license live on
+  # the permit record itself (no contacts dataset), so path B (CSLB / website) applies.
+  marin-building-permits:
+    type: socrata_building_permits
+    domain: data.marincounty.gov
+    dataset_id: mkbn-caye
+    name: Marin County Building Permits
+    jurisdiction: Marin County
+    county: Marin
+    access: api
+    # issued_date is often null (not-yet-issued); this column is always populated.
+    date_field: most_recent_issued_received_date
+    page_size: 500
+    source_url_template: "https://data.marincounty.gov/resource/mkbn-caye.json?permit_number={permit_number}"
+    field_map:
+      record_id: unique_id
+      permit_number: permit_number
+      description: [description, construction, type_permit]
+      address: [address]
+      project_date: [issued_date, received_date]
+      city: city_town
+      company_name: contractor
+      company_license: contractor_license
+
+  # ArcGIS FeatureServer example (config-only; the generic adapter handles it).
+  # DISABLED: Campbell has no contractor field — `ProjectName` is the property
+  # owner/applicant (mostly homeowner surnames / owner LLCs), so it fails the
+  # contact hard-requirement (like Sonoma). Kept here as a template: drop in a
+  # different ArcGIS city that DOES expose a contractor/applicant company field.
+  # campbell-building-permits:
+  #   type: arcgis_building_permits
+  #   name: Campbell Building Permits
+  #   jurisdiction: Campbell
+  #   county: Santa Clara
+  #   access: api
+  #   arcgis_service_url: https://services7.arcgis.com/RDyUffIeciKdYmX2/arcgis/rest/services/CampbellPermits_ActiveBuilding/FeatureServer
+  #   arcgis_layer: 0
+  #   date_field: IssuedDate
+  #   page_size: 2000
+  #   field_map:
+  #     record_id: PermitID
+  #     permit_number: ApplicationNumber
+  #     description: [ProjectDescription, WorkType]
+  #     address: [Address]
+  #     project_date: [IssuedDate]
+  #     city: City
+  #     company_name: ProjectName
+
+  # Path A: RFPs carry an issuing-agency point of contact (name/email/phone).
+  # Requires a free SAM_API_KEY (set in .env). Opt in with: --source samgov-construction
+  samgov-construction:
+    type: samgov_opportunities
+    name: SAM.gov Construction Opportunities
+    jurisdiction: California
+    county: Bay Area
+    access: api
+    page_size: 100
+    # Client-side place-of-performance filter (the SAM API geo params are unreliable).
+    # "bay_area" keeps the nine counties (city list + clean ZIP ranges, guarded by CA);
+    # use a two-letter code like "CA" for state-wide instead.
+    region: bay_area
+    naics_codes:
+      - "236220"  # Commercial and Institutional Building Construction
+      - "237310"  # Highway, Street, and Bridge Construction

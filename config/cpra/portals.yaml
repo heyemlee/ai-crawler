@@ -1,0 +1,111 @@
+# CPRA (California Public Records Act) request portals — South Bay skeleton.
+#
+# Each city's portal URL is left null on purpose: pubrec portals get renamed
+# and move between vendors (NextRequest, GovQA, JustFOIA, vanilla web forms),
+# so this is a placeholder you fill in by *visiting the city site* and pasting
+# the live URL. The `platform_hint` is where the city has historically hosted
+# requests — start there, but always confirm before sending.
+#
+# Workflow:
+#   1. Open the portal URL (or, if null, search "{city} public records
+#      request" and update this file with what you find).
+#   2. Paste the contents of docs/cpra-request-template.md as the request body,
+#      filling in <CITY>, <FROM_DATE>, <TO_DATE>.
+#   3. When the city sends back a CSV, drop it under data/cpra-inbox/
+#      and run:  projectintel import-cpra --file <path> --jurisdiction "<City>"
+#
+# Required exported columns (mirrors docs/cpra-request-template.md):
+#   permit_number, permit_type, description, address, issued_date,
+#   contractor_name, contractor_license, contractor_phone, contractor_email
+
+portals:
+  - jurisdiction: San Jose
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest
+    contact_fallback: City Clerk's office (records@sanjoseca.gov is the historical address — verify)
+    notes: |
+      Largest South Bay city; permit data behind Accela. Ask for the building-
+      permit export *including the contractor record* (not just owner/applicant)
+      to satisfy our contact hard-requirement.
+
+  - jurisdiction: Sunnyvale
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest or City Clerk web form
+    contact_fallback: City Clerk
+    notes: Permits via EnerGov; ask for the contractor field explicitly.
+
+  - jurisdiction: Cupertino
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest or City Clerk
+    contact_fallback: City Clerk
+    notes: |
+      A stale ArcGIS layer exists (last updated 2019, owner-only); CPRA is the
+      only fresh path.
+
+  - jurisdiction: Santa Clara
+    county: Santa Clara
+    portal_url: null
+    platform_hint: City Clerk web form
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Mountain View
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Palo Alto
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Milpitas
+    county: Santa Clara
+    portal_url: null
+    platform_hint: City Clerk web form
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Los Gatos
+    county: Santa Clara
+    portal_url: null
+    platform_hint: GovQA or Town Clerk
+    contact_fallback: Town Clerk
+    notes: Town (not city); check the Town Clerk page.
+
+  - jurisdiction: Saratoga
+    county: Santa Clara
+    portal_url: null
+    platform_hint: City Clerk web form
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Campbell
+    county: Santa Clara
+    portal_url: null
+    platform_hint: City Clerk
+    contact_fallback: City Clerk
+    notes: |
+      ArcGIS layer is active but only carries the property owner / applicant
+      (no contractor field); CPRA is the only path to the contractor record.
+
+  - jurisdiction: Morgan Hill
+    county: Santa Clara
+    portal_url: null
+    platform_hint: NextRequest
+    contact_fallback: City Clerk
+    notes: ""
+
+  - jurisdiction: Gilroy
+    county: Santa Clara
+    portal_url: null
+    platform_hint: City Clerk web form
+    contact_fallback: City Clerk
+    notes: ""
