@@ -16,6 +16,7 @@ def test_export_hard_filters_contact_rows(tmp_path: Path) -> None:
         source="datasf-building-permits",
         source_record_id="1",
         description="restaurant remodel",
+        project_date="2026-06-01",
         company=Company(name="Acme Builders", email="info@example.com"),
         category=Category.RESTAURANT_RETAIL,
         confidence=0.9,
@@ -26,22 +27,39 @@ def test_export_hard_filters_contact_rows(tmp_path: Path) -> None:
         source="datasf-building-permits",
         source_record_id="2",
         description="office remodel",
+        project_date="2026-06-01",
         company=Company(name="No Contact Builders"),
         category=Category.OFFICE_LAB,
         confidence=0.9,
         content_hash="p2",
     )
+    old = Project(
+        raw_record_id=_raw(db, "3"),
+        source="datasf-building-permits",
+        source_record_id="3",
+        description="old restaurant remodel",
+        project_date="2020-01-01",
+        company=Company(name="Old Builders", email="old@example.com"),
+        category=Category.RESTAURANT_RETAIL,
+        confidence=0.9,
+        content_hash="p3",
+    )
     db.upsert_project(with_contact)
     db.upsert_project(pending)
+    db.upsert_project(old)
 
     out = tmp_path / "leads.xlsx"
     stats = export_excel(db, out)
     wb = load_workbook(out)
 
+    assert stats["total"] == 2
     assert stats["exported"] == 1
     assert stats["pending"] == 1
+    assert "Summary" not in wb.sheetnames
     assert "RESTAURANT_RETAIL" in wb.sheetnames
     assert "待补全 (Pending)" in wb.sheetnames
+    assert wb["RESTAURANT_RETAIL"].cell(1, 1).value == "项目描述"
+    assert "状态" not in [cell.value for cell in wb["RESTAURANT_RETAIL"][1]]
     assert wb["RESTAURANT_RETAIL"].max_row == 2
     assert wb["待补全 (Pending)"].max_row == 2
 

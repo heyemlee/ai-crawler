@@ -10,7 +10,7 @@ import httpx
 from bay_area_projectintel.compliance.politeness import PoliteHttpClient
 from bay_area_projectintel.config import SourceConfig
 from bay_area_projectintel.db import stable_hash
-from bay_area_projectintel.geo import is_bay_area
+from bay_area_projectintel.geo import is_bay_area, is_san_jose_50mi
 from bay_area_projectintel.models import RawRecord
 
 
@@ -128,9 +128,13 @@ class SamGovOpportunitiesSource:
 
 
 def _region_matches(region: str, payload: dict[str, Any]) -> bool:
-    if region.lower() == "bay_area":
+    normalized_region = region.lower().replace("-", "_")
+    if normalized_region == "bay_area":
         city, zip_code = _place_city_zip(payload)
         return is_bay_area(city, zip_code, _place_state(payload))
+    if normalized_region in {"san_jose_50mi", "sanjose_50mi"}:
+        city, zip_code = _place_city_zip(payload)
+        return is_san_jose_50mi(city, zip_code, _place_state(payload))
     if len(region) == 2:
         return _place_state(payload) == region.upper()
     return True

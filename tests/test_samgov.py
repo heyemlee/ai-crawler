@@ -110,6 +110,37 @@ def test_sam_fetch_keeps_only_bay_area_place_of_performance() -> None:
     assert [r.source_record_id for r in records] == ["sf-1", "moffett-1"]
 
 
+def test_sam_fetch_keeps_only_san_jose_50mi_place_of_performance() -> None:
+    san_jose = dict(
+        OPPORTUNITY,
+        noticeId="sj-1",
+        placeOfPerformance={"city": {"name": "San Jose"}, "state": {"code": "CA"}, "zip": "95112"},
+    )
+    fremont = dict(
+        OPPORTUNITY,
+        noticeId="fremont-1",
+        placeOfPerformance={"city": {"name": "Fremont"}, "state": {"code": "CA"}, "zip": "94538"},
+    )
+    fresno = dict(
+        OPPORTUNITY,
+        noticeId="fresno-1",
+        placeOfPerformance={"city": {"name": "Fresno"}, "state": {"code": "CA"}, "zip": "93701"},
+    )
+
+    class MultiClient:
+        def get_json(self, url, params=None, **kwargs):
+            if (params or {}).get("offset", 0):
+                return {"opportunitiesData": []}
+            return {"opportunitiesData": [san_jose, fremont, fresno]}
+
+    config = _config()
+    config.region = "san_jose_50mi"
+    source = SamGovOpportunitiesSource("samgov", config, MultiClient(), api_key="test-key")
+    records = list(source.fetch(since="2026-05-01"))
+
+    assert [r.source_record_id for r in records] == ["sj-1", "fremont-1"]
+
+
 def test_sam_fetch_stops_gracefully_on_rate_limit() -> None:
     class RateLimitedClient:
         def get_json(self, url, params=None, **kwargs):

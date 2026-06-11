@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from typing import Any
 
 from bay_area_projectintel.config import SourceConfig
@@ -258,7 +259,13 @@ def _first_present(payload: dict[str, Any], *keys: str) -> str | None:
 def _date_only(value: str | None) -> str | None:
     if not value:
         return None
-    return value.split("T", 1)[0]
+    text = str(value).strip().split("T", 1)[0]
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            pass
+    return text.split(" ", 1)[0]
 
 
 def _clean_company_name(value: str) -> str:

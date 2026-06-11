@@ -86,3 +86,59 @@ def is_bay_area(city: str | None, zip_code: str | None, state: str | None = None
     if city and _normalize_city(city) in BAY_AREA_CITIES:
         return True
     return False
+
+
+# Approximate 50-mile radius around San Jose for sources that only expose
+# city / ZIP strings instead of coordinates. This intentionally stays
+# conservative around ambiguous ZIP prefixes.
+SAN_JOSE_50MI_CITIES: frozenset[str] = frozenset(
+    _normalized
+    for _name in (
+        # Santa Clara / South Bay
+        "San Jose", "Santa Clara", "Sunnyvale", "Cupertino", "Campbell",
+        "Los Gatos", "Saratoga", "Milpitas", "Mountain View", "Palo Alto",
+        "Los Altos", "Los Altos Hills", "Monte Sereno", "Morgan Hill",
+        "Gilroy", "Moffett Field", "Stanford",
+        # Peninsula / nearby San Mateo County
+        "East Palo Alto", "Menlo Park", "Atherton", "Redwood City",
+        "Portola Valley", "Woodside", "San Carlos", "Belmont",
+        "Foster City", "San Mateo", "Hillsborough", "Burlingame",
+        "Millbrae", "San Bruno", "South San Francisco", "Daly City",
+        "Half Moon Bay", "Pacifica", "Brisbane", "Colma",
+        # East Bay within the practical radius
+        "Fremont", "Newark", "Union City", "Hayward", "Castro Valley",
+        "Dublin", "Pleasanton", "Livermore", "San Leandro", "Alameda",
+        "Oakland", "Berkeley", "Emeryville", "Albany",
+        # Coastal / south of San Jose
+        "Santa Cruz", "Scotts Valley", "Capitola", "Watsonville",
+        "Aptos", "Soquel", "Hollister", "San Juan Bautista",
+        # San Francisco is within roughly 50 straight-line miles of San Jose.
+        "San Francisco",
+    )
+    if (_normalized := re.sub(r"[^a-z0-9 ]", "", _name.lower()).strip())
+)
+
+SAN_JOSE_50MI_ZIP_RANGES: tuple[tuple[int, int], ...] = (
+    (94002, 94099),  # Peninsula + Mountain View / Sunnyvale / Los Altos
+    (94100, 94199),  # San Francisco
+    (94301, 94309),  # Palo Alto / Stanford
+    (94401, 94499),  # San Mateo
+    (94536, 94546),  # Fremont / Newark / Union City / Hayward
+    (94550, 94552),  # Livermore / Castro Valley
+    (94566, 94568),  # Pleasanton / Dublin
+    (94600, 94720),  # Oakland / Berkeley
+    (95000, 95099),  # Santa Clara County + Santa Cruz / Hollister area
+    (95100, 95199),  # San Jose
+)
+
+
+def is_san_jose_50mi(city: str | None, zip_code: str | None, state: str | None = None) -> bool:
+    """Approximate a San Jose-centered 50-mile filter from city/ZIP fields."""
+    if state and state.upper() != "CA":
+        return False
+    zip_value = _zip_int(zip_code)
+    if zip_value is not None and any(low <= zip_value <= high for low, high in SAN_JOSE_50MI_ZIP_RANGES):
+        return True
+    if city and _normalize_city(city) in SAN_JOSE_50MI_CITIES:
+        return True
+    return False

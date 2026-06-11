@@ -26,6 +26,7 @@ class PoliteHttpClient:
         self,
         url: str,
         params: dict[str, object] | None = None,
+        headers: dict[str, str] | None = None,
         use_cache: bool = True,
         check_robots: bool = True,
     ) -> object:
@@ -36,7 +37,28 @@ class PoliteHttpClient:
             return httpx.Response(200, content=cache_path.read_bytes()).json()
 
         self.throttle(url)
-        response = self._client.get(url, params=params)
+        response = self._client.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        cache_path.write_bytes(response.content)
+        return response.json()
+
+    def post_json(
+        self,
+        url: str,
+        payload: dict[str, object] | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        use_cache: bool = True,
+        check_robots: bool = True,
+    ) -> object:
+        if check_robots:
+            self.ensure_allowed(url)
+        cache_path = self._cache_path(url, {"__method": "POST", "__payload": repr(payload or {})})
+        if use_cache and cache_path.exists():
+            return httpx.Response(200, content=cache_path.read_bytes()).json()
+
+        self.throttle(url)
+        response = self._client.post(url, json=payload or {}, headers=headers)
         response.raise_for_status()
         cache_path.write_bytes(response.content)
         return response.json()

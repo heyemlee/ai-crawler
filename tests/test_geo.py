@@ -1,4 +1,4 @@
-from bay_area_projectintel.geo import is_bay_area
+from bay_area_projectintel.geo import is_bay_area, is_san_jose_50mi
 
 
 def test_bay_area_city_name_match() -> None:
@@ -27,3 +27,16 @@ def test_state_guard_rejects_same_name_out_of_state() -> None:
 
 def test_unknown_place_is_not_bay_area() -> None:
     assert not is_bay_area(None, None, None)
+
+
+def test_san_jose_50mi_matches_nearby_cities_and_zips() -> None:
+    assert is_san_jose_50mi("San Jose", None, "CA")
+    assert is_san_jose_50mi("Fremont", None, "CA")
+    assert is_san_jose_50mi("LINDA", "94035", "CA")  # Moffett Field ZIP
+    assert is_san_jose_50mi(None, "95112", "CA")
+
+
+def test_san_jose_50mi_rejects_far_or_out_of_state_places() -> None:
+    assert not is_san_jose_50mi("Fresno", "93701", "CA")
+    assert not is_san_jose_50mi("Richmond", None, "VA")
+    assert not is_san_jose_50mi(None, None, None)

@@ -19,7 +19,7 @@ class RuntimeSettings(BaseSettings):
     cache_dir: Path = Path(".cache/projectintel")
     cslb_master_csv: Path = Path(".cache/projectintel/cslb/MasterLicenseData.csv")
     user_agent: str = "BayAreaProjectIntel/0.1 (contact: you@example.com)"
-    default_lookback_days: int = 60
+    default_lookback_days: int = 90
     # Stable path to the most recent export, so a scheduler / WeChat bridge can always
     # return "the latest Excel" without knowing the per-run filename.
     latest_excel_path: Path = Path("data/latest-leads.xlsx")
@@ -95,6 +95,21 @@ class SourceConfig(BaseModel):
     # fields named in field_map.project_date are converted to ISO dates by the adapter.
     arcgis_service_url: str | None = None
     arcgis_layer: int = 0
+
+    # Accela / EnerGov / other permit portals that expose a public JSON search
+    # endpoint. These adapters normalize the returned records into the same
+    # payload shape as Socrata so the existing normalize/classify/export pipeline
+    # is reused.
+    search_url: str | None = None
+    detail_url_template: str | None = None
+    record_path: str | None = None
+    query_params: dict[str, Any] = Field(default_factory=dict)
+    request_headers: dict[str, str] = Field(default_factory=dict)
+    criteria_url: str | None = None
+    since_param: str | None = None
+    limit_param: str | None = None
+    offset_param: str | None = None
+    page_param: str | None = None
 
     # SAM.gov opportunities
     api_base_url: str = "https://api.sam.gov/opportunities/v2/search"

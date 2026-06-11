@@ -41,6 +41,7 @@ from bay_area_projectintel.sources.discover import (
 
 app = typer.Typer(help="Bay Area ProjectIntel CLI")
 console = Console()
+MAX_LOOKBACK_DAYS = 90
 
 
 def _runtime() -> tuple[Database, object]:
@@ -69,10 +70,14 @@ def fetch(
         min_interval_seconds=config.settings.politeness_min_interval,
     )
     try:
+        cutoff_since = (date.today() - timedelta(days=MAX_LOOKBACK_DAYS)).isoformat()
         effective_since = since or db.get_watermark(source)
         if not effective_since:
-            days = lookback_days or config.settings.default_lookback_days
+            requested_days = lookback_days or config.settings.default_lookback_days
+            days = min(requested_days, MAX_LOOKBACK_DAYS)
             effective_since = (date.today() - timedelta(days=days)).isoformat()
+        elif effective_since < cutoff_since:
+            effective_since = cutoff_since
 
         source_impl = build_source(source, source_config, client, config.settings)
         inserted = 0
@@ -477,7 +482,7 @@ def import_cpra(
 @app.command()
 def run(
     sources: list[str] = typer.Option(["datasf-building-permits"], "--source", "-s"),
-    lookback_days: int = typer.Option(60, "--lookback-days"),
+    lookback_days: int = typer.Option(90, "--lookback-days"),
     out: Path = typer.Option(Path("leads.xlsx"), "--out", "-o"),
     limit: int | None = typer.Option(None, "--limit"),
     browser: bool = typer.Option(False, "--browser"),

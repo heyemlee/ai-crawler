@@ -74,5 +74,5 @@ def build_summary(rows, latest_excel: Path | None = None, failure: str | None = 
         f"待补全（无联系方式）：{summary.pending}",
     ]
     if latest_excel:
-        lines.append(f"最新 Excel：{latest_excel}")
+        lines.append(f"最新 Excel：{latest_excel.as_posix()}")
     return Notification(subject="ProjectIntel 数据更新", body="\n".join(lines))

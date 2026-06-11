@@ -20,7 +20,7 @@ projectintel run \
   -s datasf-building-permits \
   -s marin-building-permits \
   -s samgov-construction \
-  --lookback-days 60 --out leads.xlsx
+  --lookback-days 90 --out leads.xlsx
 ```
 
 `run` defaults to `datasf-building-permits` only — pass `-s` for each source you
@@ -198,7 +198,7 @@ list with defaults):
 
 | Env var | Default | What it controls |
 |---|---|---|
-| `PROJECTINTEL_DEFAULT_LOOKBACK_DAYS` | `60` | Fetch window when there is no watermark/`--since` |
+| `PROJECTINTEL_DEFAULT_LOOKBACK_DAYS` | `90` | Fetch window when there is no watermark/`--since` |
 | `PROJECTINTEL_POLITENESS_MIN_INTERVAL` | `0.35` | Min seconds between requests to one domain |
 | `PROJECTINTEL_DEDUPE_ADDRESS_THRESHOLD` | `92` | Dedupe address match cutoff (0-100) |
 | `PROJECTINTEL_DEDUPE_TITLE_THRESHOLD` | `72` | Dedupe title match cutoff (0-100) |
