@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 from pathlib import Path
 from urllib import robotparser
@@ -17,6 +18,10 @@ class PoliteHttpClient:
         self.min_interval_seconds = min_interval_seconds
         self._last_request_by_domain: dict[str, float] = {}
         self._robots: dict[str, robotparser.RobotFileParser] = {}
+        # Per-domain locks: concurrent same-domain requests serialize (politeness held),
+        # different domains run in parallel. `_locks_guard` guards the lock registry.
+        self._domain_locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
         self._client = httpx.Client(timeout=30, headers={"User-Agent": user_agent})
 
     def close(self) -> None:
@@ -36,8 +41,9 @@ class PoliteHttpClient:
         if use_cache and cache_path.exists():
             return httpx.Response(200, content=cache_path.read_bytes()).json()
 
-        self.throttle(url)
-        response = self._client.get(url, params=params, headers=headers)
+        with self._domain_lock(url):
+            self.throttle(url)
+            response = self._client.get(url, params=params, headers=headers)
         response.raise_for_status()
         cache_path.write_bytes(response.content)
         return response.json()
@@ -57,8 +63,9 @@ class PoliteHttpClient:
         if use_cache and cache_path.exists():
             return httpx.Response(200, content=cache_path.read_bytes()).json()
 
-        self.throttle(url)
-        response = self._client.post(url, json=payload or {}, headers=headers)
+        with self._domain_lock(url):
+            self.throttle(url)
+            response = self._client.post(url, json=payload or {}, headers=headers)
         response.raise_for_status()
         cache_path.write_bytes(response.content)
         return response.json()
@@ -69,8 +76,9 @@ class PoliteHttpClient:
         if use_cache and cache_path.exists():
             return cache_path.read_text(encoding="utf-8", errors="replace")
 
-        self.throttle(url)
-        response = self._client.get(url)
+        with self._domain_lock(url):
+            self.throttle(url)
+            response = self._client.get(url)
         response.raise_for_status()
         cache_path.write_bytes(response.content)
         return response.text
@@ -99,6 +107,22 @@ class PoliteHttpClient:
         if wait > 0:
             time.sleep(wait)
         self._last_request_by_domain[domain] = time.monotonic()
+
+    def _domain_lock(self, url: str) -> threading.Lock:
+        """Return the lock for a URL's domain (created on first use).
+
+        Held across throttle + the HTTP send so two threads can't interleave
+        requests to the same domain — per-domain rate limiting stays correct under
+        concurrency, while different domains acquire different locks and run in
+        parallel.
+        """
+        domain = urlparse(url).netloc
+        with self._locks_guard:
+            lock = self._domain_locks.get(domain)
+            if lock is None:
+                lock = threading.Lock()
+                self._domain_locks[domain] = lock
+            return lock
 
     def _cache_path(self, url: str, params: dict[str, object] | None) -> Path:
         key = repr((url, sorted((params or {}).items()))).encode("utf-8")

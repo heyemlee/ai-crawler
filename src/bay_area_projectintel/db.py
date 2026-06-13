@@ -30,6 +30,10 @@ class Database:
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        # WAL + a generous busy timeout so multiple sharded workers can write the
+        # same SQLite file concurrently without tripping "database is locked".
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 10000")
         try:
             yield conn
             conn.commit()
