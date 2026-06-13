@@ -31,9 +31,13 @@ dev = [
 browser = [
   "scrapling[fetchers]>=0.4",
 ]
+mcp = [
+  "mcp>=1.2",
+]
 
 [project.scripts]
 projectintel = "bay_area_projectintel.cli:app"
+projectintel-mcp = "bay_area_projectintel.mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
