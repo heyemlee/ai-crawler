@@ -33,7 +33,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 from bay_area_projectintel.config import load_config
-from bay_area_projectintel.notify import parse_recipients
+from bay_area_projectintel.notify import EmailChannel, Notification, parse_recipients
 
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -123,10 +123,31 @@ class Runner:
         threading.Thread(target=self._run, kwargs={"email": email}, daemon=True).start()
         return True
 
+    def _subprocess_env(self) -> dict[str, str]:
+        """Inject the operator-saved SMTP settings as PROJECTINTEL_* env for the CLI,
+        so email config done in the browser takes effect without env vars / redeploy."""
+        env = dict(os.environ)
+        cfg = self.config.load()
+        overrides = {
+            "PROJECTINTEL_SMTP_HOST": cfg.get("smtp_host"),
+            "PROJECTINTEL_SMTP_PORT": cfg.get("smtp_port"),
+            "PROJECTINTEL_SMTP_USE_SSL": cfg.get("smtp_use_ssl"),
+            "PROJECTINTEL_SMTP_USER": cfg.get("smtp_user"),
+            "PROJECTINTEL_SMTP_PASSWORD": cfg.get("smtp_password"),
+            "PROJECTINTEL_EMAIL_FROM": cfg.get("email_from"),
+            "PROJECTINTEL_EMAIL_TO": cfg.get("email_to"),
+        }
+        for key, value in overrides.items():
+            if value not in (None, ""):
+                env[key] = str(value)
+        return env
+
     def _exec(self, args: list[str], log) -> bool:
         log.write(f"\n$ {' '.join(args)}\n")
         log.flush()
-        proc = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, check=False)
+        proc = subprocess.run(
+            args, stdout=log, stderr=subprocess.STDOUT, check=False, env=self._subprocess_env()
+        )
         return proc.returncode == 0
 
     def _run(self, *, email: bool) -> None:
@@ -179,7 +200,16 @@ _state_dir = _settings.db_path.parent
 _out_path = Path(os.environ.get("PROJECTINTEL_OUT", str(_state_dir / "leads.xlsx")))
 _config_store = ConfigStore(
     _state_dir / "operator-config.json",
-    defaults={"email_to": _settings.email_to or "", "email_subject": ""},
+    defaults={
+        "smtp_host": _settings.smtp_host,
+        "smtp_port": str(_settings.smtp_port),
+        "smtp_use_ssl": "true" if _settings.smtp_use_ssl else "false",
+        "smtp_user": _settings.smtp_user or "",
+        "smtp_password": _settings.smtp_password or "",
+        "email_from": _settings.email_from or "",
+        "email_to": _settings.email_to or "",
+        "email_subject": "",
+    },
 )
 _runner = Runner(
     out_path=_out_path,
@@ -217,11 +247,17 @@ def index(request: Request, _: None = Depends(require_auth)) -> HTMLResponse:
         request,
         "index.html",
         {
-            "email_to": cfg.get("email_to", ""),
-            "email_subject": cfg.get("email_subject", ""),
+            "cfg": cfg,
+            "has_password": bool(cfg.get("smtp_password")),
             "has_excel": _settings.latest_excel_path.exists() or _out_path.exists(),
         },
     )
+
+
+@app.get("/email-setup", response_class=HTMLResponse)
+def email_setup(request: Request, _: None = Depends(require_auth)) -> HTMLResponse:
+    """In-app tutorial for getting SMTP credentials (Gmail / Microsoft 365 / custom)."""
+    return _TEMPLATES.TemplateResponse(request, "email_setup.html", {})
 
 
 @app.get("/status")
@@ -237,14 +273,62 @@ def run(_: None = Depends(require_auth)) -> JSONResponse:
 
 @app.post("/config")
 def save_config(
+    smtp_host: str = Form(""),
+    smtp_port: str = Form(""),
+    smtp_use_ssl: str = Form("false"),
+    smtp_user: str = Form(""),
+    smtp_password: str = Form(""),
+    email_from: str = Form(""),
     email_to: str = Form(""),
     email_subject: str = Form(""),
     _: None = Depends(require_auth),
 ) -> RedirectResponse:
     # Normalize the recipient list so a typo'd separator doesn't silently drop people.
     recipients = ", ".join(parse_recipients(email_to))
-    _config_store.save(email_to=recipients, email_subject=email_subject.strip())
+    fields = {
+        "smtp_host": smtp_host.strip() or "smtp.gmail.com",
+        "smtp_port": smtp_port.strip() or "465",
+        "smtp_use_ssl": "true" if smtp_use_ssl.lower() in ("true", "on", "1", "yes") else "false",
+        "smtp_user": smtp_user.strip(),
+        "email_from": email_from.strip() or smtp_user.strip(),
+        "email_to": recipients,
+        "email_subject": email_subject.strip(),
+    }
+    # Password: blank means "keep the existing one", so the form never has to echo it.
+    if smtp_password:
+        fields["smtp_password"] = smtp_password
+    _config_store.save(**fields)
     return RedirectResponse("/?saved=1", status_code=303)
+
+
+def _channel_from_config(cfg: dict[str, Any], recipients) -> EmailChannel:
+    return EmailChannel(
+        host=cfg.get("smtp_host") or "smtp.gmail.com",
+        port=int(cfg.get("smtp_port") or 465),
+        user=cfg.get("smtp_user") or "",
+        password=cfg.get("smtp_password") or "",
+        sender=cfg.get("email_from") or cfg.get("smtp_user") or "",
+        recipients=recipients,
+        use_ssl=str(cfg.get("smtp_use_ssl", "true")).lower() in ("1", "true", "yes", "on"),
+    )
+
+
+@app.post("/test-email")
+def test_email(_: None = Depends(require_auth)) -> JSONResponse:
+    """Send one test email with the saved config — immediate, specific feedback."""
+    cfg = _config_store.load()
+    recipients = parse_recipients(cfg.get("email_to"))
+    if not recipients:
+        return JSONResponse({"ok": False, "error": "请先填写并保存收件人。"})
+    if not cfg.get("smtp_user") or not cfg.get("smtp_password"):
+        return JSONResponse({"ok": False, "error": "请先填写并保存发件邮箱和密码。"})
+    try:
+        _channel_from_config(cfg, recipients).send(
+            Notification("ProjectIntel 测试邮件", "配置成功！这是控制台发出的一封测试邮件。")
+        )
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+    return JSONResponse({"ok": True})
 
 
 @app.post("/send-latest")

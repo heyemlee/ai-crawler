@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>邮箱密码获取教程 — ProjectIntel</title>
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --fg:#e2e8f0; --muted:#94a3b8;
+            --accent:#3b82f6; --warn:#f59e0b; }
+    body { margin:0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background: var(--bg); color: var(--fg); line-height: 1.7; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 80px; }
+    h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 30px; }
+    a { color: var(--accent); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 16px 0; }
+    ol { padding-left: 20px; } li { margin: 8px 0; }
+    code { background:#0b1220; border:1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+    .warn { background: rgba(245,158,11,.12); border-left: 3px solid var(--warn); padding: 10px 14px; border-radius: 6px; margin: 12px 0; }
+    .back { display:inline-block; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">← 返回控制台</a>
+    <h1>📧 邮箱密码怎么获取</h1>
+    <p>这个工具用一个发件邮箱把线索表格发出去。下面按你的邮箱类型选一种，拿到密码后填回控制台的「邮件设置」。<b>注意：基本都不是用你平时登录的密码，而是单独生成的「应用专用密码」。</b></p>
+
+    <div class="card">
+      <h2>A. Gmail（@gmail.com）</h2>
+      <ol>
+        <li>开两步验证：打开 <a href="https://myaccount.google.com/security" target="_blank">myaccount.google.com/security</a> → 开启「两步验证 / 2-Step Verification」。</li>
+        <li>生成应用专用密码：打开 <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a> → 起个名字（如 <code>projectintel</code>）→ 生成 → 复制那 16 位密码。</li>
+        <li>回到控制台「邮件设置」：服务商选 <b>Gmail</b>，发件邮箱填你的 Gmail，密码粘刚才那 16 位 → 保存 → 发测试邮件。</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>B. 公司邮箱 @ravv.com（微软 Microsoft 365）</h2>
+      <p>你们的 <code>@ravv.com</code> 邮箱托管在微软 Microsoft 365。比 Gmail 麻烦一点，因为微软默认会关掉「用密码直接发信」，可能需要 IT 管理员配合。</p>
+      <ol>
+        <li><b>（管理员做）开启 SMTP 发信权限：</b>登录 <a href="https://admin.microsoft.com" target="_blank">admin.microsoft.com</a> → 用户 → 选中该邮箱 → 「邮件 / Mail」标签 → 「管理电子邮件应用 / Manage email apps」→ 勾上 <b>已通过身份验证的 SMTP（Authenticated SMTP）</b> → 保存。</li>
+        <li><b>拿密码：</b>
+          <ul>
+            <li>若账号开了两步验证（MFA）：登录 <a href="https://mysignins.microsoft.com/security-info" target="_blank">mysignins.microsoft.com/security-info</a> → 添加「应用密码 / App password」→ 复制。</li>
+            <li>若没开两步验证：通常可直接用邮箱的登录密码。</li>
+          </ul>
+        </li>
+        <li>回到控制台「邮件设置」：服务商选 <b>Microsoft 365</b>（会自动填 <code>smtp.office365.com</code> / 端口 <code>587</code> / 不勾 SSL），发件邮箱填 <code>你@ravv.com</code>，密码粘上一步拿到的 → 保存 → 发测试邮件。</li>
+      </ol>
+      <div class="warn">
+        <b>如果测试邮件报 “authentication failed / 5.7.x” 之类：</b>多半是第 1 步没开，或公司整个租户禁用了基本认证。最快的替代办法——<b>改用一个 Gmail 来发</b>（按上面 A），<code>@ravv.com</code> 的人照样能收到，业务上没影响。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>C. 其他邮箱（自定义）</h2>
+      <p>找你邮箱服务商的「SMTP 设置」页，拿到：SMTP 服务器地址、端口（一般 465 或 587）、用户名（通常是完整邮箱）、密码（或应用专用密码）。在控制台「邮件设置」里服务商选「自定义」，按页面填即可。</p>
+    </div>
+
+    <p class="warn">小贴士：只有「发件邮箱」需要密码。<b>收件人</b>（拿线索表格的人）什么都不用弄，直接收邮件就行。</p>
+    <a class="back" href="/">← 返回控制台</a>
+  </div>
+</body>
+</html>
