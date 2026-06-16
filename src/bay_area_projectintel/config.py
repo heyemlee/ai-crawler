@@ -26,6 +26,18 @@ class RuntimeSettings(BaseSettings):
     # Where `notify` appends summaries when run unattended (e.g. by launchd).
     notify_log_path: Path = Path("data/notify.log")
 
+    # --- Email delivery (auto-send the leads Excel) ---
+    # Defaults target Gmail SMTP over SSL. The password MUST be a Gmail App Password
+    # (https://myaccount.google.com/apppasswords) — your normal account password
+    # will not work with SMTP. All of these read from PROJECTINTEL_* env / .env.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 465
+    smtp_use_ssl: bool = True  # 465=SSL; set False for 587 STARTTLS.
+    smtp_user: str | None = None  # the sending account, e.g. you@gmail.com
+    smtp_password: str | None = None  # Gmail App Password (not the account password)
+    email_from: str | None = None  # From header; defaults to smtp_user
+    email_to: str | None = None  # comma-separated recipient(s) for the report
+
     # --- Tunables (override via PROJECTINTEL_* env or .env) ---
     # Compliance: minimum seconds between requests to the same domain.
     politeness_min_interval: float = 0.35

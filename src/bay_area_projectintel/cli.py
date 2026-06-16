@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -17,7 +18,14 @@ from bay_area_projectintel.enrichment.cslb import download_master_csv
 from bay_area_projectintel.export.excel import export_excel
 from bay_area_projectintel.llm.client import DeepSeekClassifier
 from bay_area_projectintel.models import Category
-from bay_area_projectintel.notify import FileChannel, StdoutChannel, build_summary, dispatch
+from bay_area_projectintel.notify import (
+    EmailChannel,
+    FileChannel,
+    StdoutChannel,
+    build_summary,
+    dispatch,
+    parse_recipients,
+)
 from bay_area_projectintel.pipeline.classify import classify_with_rules
 from bay_area_projectintel.pipeline.dedupe import dedupe_projects
 from bay_area_projectintel.pipeline.normalize import normalize_raw_record
@@ -272,6 +280,67 @@ def notify(
         console.print(f"[yellow]Notification channels failed: {', '.join(failed)}[/yellow]")
 
 
+@app.command()
+def email(
+    to: str | None = typer.Option(None, "--to", help="Comma-separated recipient(s). Defaults to PROJECTINTEL_EMAIL_TO."),
+    attach: Path | None = typer.Option(None, "--attach", help="File to attach. Defaults to the latest Excel."),
+    subject: str | None = typer.Option(None, "--subject", help="Override the email subject."),
+    category: str | None = typer.Option(None, "--category", help="Summarize only this category."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Write the .eml to data/ instead of sending."),
+) -> None:
+    """Email the latest leads Excel + a summary via SMTP (Gmail by default).
+
+    Configure PROJECTINTEL_SMTP_USER / PROJECTINTEL_SMTP_PASSWORD (a Gmail App
+    Password) and PROJECTINTEL_EMAIL_TO in .env, then run this after an export.
+    """
+    db, config = _runtime()
+    settings = config.settings
+    if category:
+        Category(category)
+
+    attach_path = Path(attach) if attach else settings.latest_excel_path
+    # Attachment carries the spreadsheet, so omit the local-path line from the body.
+    note = build_summary(db.export_rows(category=category), latest_excel=None)
+    if subject:
+        note = replace(note, subject=subject)
+    if attach_path and attach_path.exists():
+        note = replace(note, attachments=(attach_path,))
+    else:
+        console.print(f"[yellow]Attachment not found ({attach_path}); sending summary only.[/yellow]")
+
+    recipients = parse_recipients(to or settings.email_to)
+    if not recipients:
+        raise typer.BadParameter("No recipients. Pass --to or set PROJECTINTEL_EMAIL_TO.")
+    sender = settings.email_from or settings.smtp_user
+    if not dry_run and (not settings.smtp_user or not settings.smtp_password):
+        raise typer.BadParameter(
+            "Set PROJECTINTEL_SMTP_USER and PROJECTINTEL_SMTP_PASSWORD (a Gmail App "
+            "Password) in .env, or use --dry-run."
+        )
+
+    channel = EmailChannel(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        user=settings.smtp_user or "",
+        password=settings.smtp_password or "",
+        sender=sender or "",
+        recipients=recipients,
+        use_ssl=settings.smtp_use_ssl,
+        dry_run_dir=(settings.db_path.parent if dry_run else None),
+    )
+    try:
+        channel.send(note)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]Email failed: {type(exc).__name__}: {exc}[/red]")
+        raise typer.Exit(code=1)
+
+    attached = ", ".join(p.name for p in note.attachments) or "no attachment"
+    if dry_run:
+        console.print(f"[green]Dry-run: wrote .eml to {settings.db_path.parent} ({attached}).[/green]")
+    else:
+        console.print(f"[green]Emailed {', '.join(recipients)} ({attached}).[/green]")
+
+
 @app.command(name="install-schedule")
 def install_schedule(
     weekday: int = typer.Option(1, "--weekday", help="0=Sun..6=Sat (launchd Weekday). Default Monday."),
@@ -297,8 +366,13 @@ def install_schedule(
         "# Weekly ProjectIntel run. caffeinate keeps the Mac awake for the duration.\n"
         "set -euo pipefail\n"
         f'cd "{project_dir}"\n'
-        f'if "{python_bin}" -m bay_area_projectintel.cli run; then\n'
+        "# Refresh all key-free permit sources (add SAM.gov here once SAM_API_KEY is set).\n"
+        'SOURCES="-s datasf-building-permits -s marin-building-permits'
+        ' -s sanjose-active-building-permits -s sunnyvale-energov-permits"\n'
+        f'if "{python_bin}" -m bay_area_projectintel.cli run $SOURCES --out leads.xlsx; then\n'
         f'  "{python_bin}" -m bay_area_projectintel.cli notify --file\n'
+        "  # Auto-email the spreadsheet (no-op if SMTP env is unset).\n"
+        f'  "{python_bin}" -m bay_area_projectintel.cli email --attach leads.xlsx || true\n'
         "else\n"
         f'  "{python_bin}" -m bay_area_projectintel.cli notify --file || true\n'
         "fi\n",
@@ -486,6 +560,9 @@ def run(
     out: Path = typer.Option(Path("leads.xlsx"), "--out", "-o"),
     limit: int | None = typer.Option(None, "--limit"),
     browser: bool = typer.Option(False, "--browser"),
+    email_report: bool = typer.Option(
+        False, "--email", help="Email the exported Excel after the run (needs SMTP env)."
+    ),
 ) -> None:
     """Run fetch, classify, enrich, and export."""
     for source in sources:
@@ -495,6 +572,8 @@ def run(
     enrich(category=None, browser=browser, download_cslb=False, limit=None)
     export(out=out, category=None)
     report(category=None)
+    if email_report:
+        email(to=None, attach=out, subject=None, category=None, dry_run=False)
 
 
 if __name__ == "__main__":

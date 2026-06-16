@@ -532,6 +532,70 @@ def set_company_contact(
     }
 
 
+@mcp.tool()
+def send_email_report(
+    to: str | None = None,
+    attach_path: str | None = None,
+    subject: str | None = None,
+    category: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Email the latest leads Excel + a summary via SMTP (Gmail by default).
+
+    The body is the same data-update summary as ``notify``; the spreadsheet rides
+    along as an attachment (defaults to the latest export). SMTP is not the web
+    crawl path, so robots/rate-limit don't apply — but credentials and recipients
+    must be configured: set PROJECTINTEL_SMTP_USER / PROJECTINTEL_SMTP_PASSWORD (a
+    Gmail App Password), PROJECTINTEL_EMAIL_TO. Pass ``dry_run=True`` to write the
+    composed ``.eml`` under ``data/`` instead of sending (no creds needed).
+    """
+    from dataclasses import replace
+
+    from bay_area_projectintel.db import Database
+    from bay_area_projectintel.notify import EmailChannel, build_summary, parse_recipients
+
+    db = Database(_settings.db_path)
+    db.migrate()
+
+    attach = Path(attach_path) if attach_path else _settings.latest_excel_path
+    note = build_summary(db.export_rows(category=category), latest_excel=None)
+    if subject:
+        note = replace(note, subject=subject)
+    if attach and attach.exists():
+        note = replace(note, attachments=(attach,))
+
+    recipients = parse_recipients(to or _settings.email_to)
+    if not recipients:
+        return {"ok": False, "error": "no recipients (pass `to` or set PROJECTINTEL_EMAIL_TO)"}
+    if not dry_run and (not _settings.smtp_user or not _settings.smtp_password):
+        return {
+            "ok": False,
+            "error": "SMTP creds missing: set PROJECTINTEL_SMTP_USER + PROJECTINTEL_SMTP_PASSWORD",
+        }
+
+    channel = EmailChannel(
+        host=_settings.smtp_host,
+        port=_settings.smtp_port,
+        user=_settings.smtp_user or "",
+        password=_settings.smtp_password or "",
+        sender=_settings.email_from or _settings.smtp_user or "",
+        recipients=recipients,
+        use_ssl=_settings.smtp_use_ssl,
+        dry_run_dir=(_settings.db_path.parent if dry_run else None),
+    )
+    try:
+        channel.send(note)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    return {
+        "ok": True,
+        "recipients": list(recipients),
+        "attached": [p.name for p in note.attachments],
+        "dry_run": dry_run,
+    }
+
+
 def main() -> None:
     """Console entrypoint — runs the MCP server over stdio."""
     mcp.run()
