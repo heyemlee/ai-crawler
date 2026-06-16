@@ -1,0 +1,23 @@
+# Keep the build context small and the image clean. Mutable state and local-only
+# files are excluded; src/, config/, pyproject.toml, README.md and deploy/ stay.
+.git
+.gitignore
+.venv
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.cache
+data
+*.egg-info
+src/*.egg-info
+
+# Local-only / large artifacts — never needed in the image.
+.env
+.mcp.json
+scripts
+tests
+docs
+todolist.md
+*.xlsx
+5A288E10

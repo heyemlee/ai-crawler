@@ -145,15 +145,53 @@ projectintel notify          # print a short data-update summary
 projectintel notify --file   # also append it to data/notify.log
 ```
 
-`notify` uses pluggable channels (stdout and file today). To run weekly and
-unattended on macOS, generate a launchd job:
+`notify` uses pluggable channels (stdout and file today).
+
+### Email the spreadsheet
+
+`email` sends the leads workbook as an attachment plus the same summary in the
+body, over SMTP (Gmail by default):
+
+```bash
+projectintel email                      # attach the latest Excel, send to PROJECTINTEL_EMAIL_TO
+projectintel email --to a@x.com,b@y.com --attach leads.xlsx
+projectintel email --dry-run            # write the composed .eml to data/ — no send, no creds
+projectintel run --email -s datasf-building-permits   # full pipeline, then email the result
+```
+
+Configure SMTP in `.env` (see `.env.example`): `PROJECTINTEL_SMTP_USER`,
+`PROJECTINTEL_SMTP_PASSWORD` (a Gmail **App Password**, not your account
+password — create one at https://myaccount.google.com/apppasswords), and
+`PROJECTINTEL_EMAIL_TO`. Gmail SMTP caps at ~500 messages/day, which is ample for
+report delivery. The same action is available to the agent as the
+`send_email_report` MCP tool, and the weekly skill calls it as its final step.
+
+### Operator web dashboard
+
+For a non-technical operator, `projectintel-web` serves a small browser UI to run
+the pipeline, download the spreadsheet, and set the email recipient — no terminal.
+
+```bash
+pip install -e ".[web]"
+projectintel-web        # serves on $PORT (default 8000) → http://localhost:8000
+```
+
+Buttons: **开始跑批** (run fetch→…→export→email in the background, with live status +
+log), **下载最新表格** (download the latest Excel), **立即重发最新表格** (re-send
+without re-running). The recipient/subject set in the UI persist to
+`<db dir>/operator-config.json`. Set `OPERATOR_PASSWORD` to gate the site with HTTP
+Basic auth before exposing it publicly. This is the process deployed on Railway —
+see [deploy/README.md](deploy/README.md).
+
+To run weekly and unattended on macOS, generate a launchd job:
 
 ```bash
 projectintel install-schedule            # default: Monday 08:00
 ```
 
-This writes `scripts/weekly-run.sh` (wraps `run` then `notify` under
-`caffeinate` so the Mac stays awake mid-run) and a launchd plist into `scripts/`.
+This writes `scripts/weekly-run.sh` (wraps `run`, then `notify`, then `email`
+under `caffeinate` so the Mac stays awake mid-run) and a launchd plist into
+`scripts/`.
 Nothing is loaded automatically — loading a launchd job and waking the Mac modify
 your system, so the commands are printed for you to review and run:
 
@@ -207,6 +245,9 @@ list with defaults):
 | `PROJECTINTEL_WEB_MIN_DISCOVERY_TOKEN_LEN` | `4` | Min single-token length before guessing a domain |
 | `PROJECTINTEL_BROWSER_MAX_PAGES` | `4` | Pages rendered per company in browser enrichment |
 | `PROJECTINTEL_LATEST_EXCEL_PATH` | `data/latest-leads.xlsx` | Stable pointer to the newest export |
+| `PROJECTINTEL_SMTP_HOST` / `_PORT` / `_USE_SSL` | `smtp.gmail.com` / `465` / `true` | SMTP server for `email` |
+| `PROJECTINTEL_SMTP_USER` / `_PASSWORD` | — | Sending account + Gmail **App Password** |
+| `PROJECTINTEL_EMAIL_FROM` / `_TO` | `SMTP_USER` / — | From header / comma-separated recipient(s) |
 
 ## Notes
 

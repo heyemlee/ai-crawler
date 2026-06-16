@@ -1,0 +1,16 @@
+# Railway service config for the ProjectIntel operator web dashboard.
+# Build from the Dockerfile and keep it running (it's a long-lived web server that
+# binds $PORT). Restart on failure. Mount a volume at /data (see deploy/README.md).
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "projectintel-web"
+restartPolicyType = "on_failure"
+healthcheckPath = "/healthz"
+
+# Want an UNATTENDED weekly run too? A Railway volume attaches to only ONE service,
+# so don't add a second service on the same volume. Instead either let the operator
+# click "开始跑批", or create a SEPARATE Railway service from this same repo whose
+# start command is the cron entrypoint and give IT the volume:
+#   [deploy] startCommand = "/app/deploy/railway-run.sh"  +  cronSchedule = "0 15 * * 1"

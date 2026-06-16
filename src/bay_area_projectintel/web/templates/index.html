@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProjectIntel 线索控制台</title>
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --fg:#e2e8f0; --muted:#94a3b8;
+            --accent:#3b82f6; --ok:#22c55e; --bad:#ef4444; --warn:#f59e0b; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background: var(--bg); color: var(--fg); line-height: 1.5; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px 64px; }
+    h1 { font-size: 20px; margin: 8px 0 4px; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+            padding: 18px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); font-weight: 600;
+               text-transform: uppercase; letter-spacing: .04em; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button, .btn { font: inherit; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer;
+            background: var(--accent); color: white; font-weight: 600; text-decoration: none; display: inline-block; }
+    button.secondary, .btn.secondary { background: #475569; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .pill { display:inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pill.idle { background:#334155; color: var(--muted); }
+    .pill.running { background: rgba(245,158,11,.15); color: var(--warn); }
+    .pill.success { background: rgba(34,197,94,.15); color: var(--ok); }
+    .pill.failed { background: rgba(239,68,68,.15); color: var(--bad); }
+    label { display:block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+    input[type=text] { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+            background: #0b1220; color: var(--fg); font: inherit; }
+    pre { background:#0b1220; border:1px solid var(--line); border-radius: 8px; padding: 12px;
+          font-size: 12px; max-height: 280px; overflow:auto; white-space: pre-wrap; word-break: break-word; color:#cbd5e1; }
+    .meta { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .saved { background: rgba(34,197,94,.15); color: var(--ok); padding: 8px 12px; border-radius: 8px;
+             font-size: 13px; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🏗️ ProjectIntel 线索控制台</h1>
+    <div class="sub">点一下「开始跑批」即可刷新线索并自动发邮件；也可单独下载或重发最新表格。</div>
+
+    <div id="saved" class="saved" style="display:none">✅ 已保存</div>
+
+    <div class="card">
+      <h2>运行</h2>
+      <div class="row">
+        <button id="runBtn" onclick="startRun()">▶ 开始跑批</button>
+        <a class="btn secondary" href="/download">⬇ 下载最新表格</a>
+        <button class="secondary" onclick="sendLatest()">✉ 立即重发最新表格</button>
+        <span id="statePill" class="pill idle">空闲</span>
+      </div>
+      <div class="meta" id="meta"></div>
+      <pre id="log">（暂无运行日志）</pre>
+    </div>
+
+    <div class="card">
+      <h2>邮件设置</h2>
+      <form method="post" action="/config">
+        <label>收件人（多个用逗号分隔）</label>
+        <input type="text" name="email_to" value="{{ email_to }}" placeholder="someone@example.com, other@example.com" />
+        <label>邮件主题（留空则用默认「ProjectIntel 数据更新」）</label>
+        <input type="text" name="email_subject" value="{{ email_subject }}" placeholder="本周线索更新" />
+        <div class="row" style="margin-top:14px"><button type="submit">保存设置</button></div>
+      </form>
+      <div class="meta">跑批完成后表格会自动发到这里；SMTP 账号在服务器环境变量里配置。</div>
+    </div>
+  </div>
+
+  <script>
+    const STATE_LABEL = { idle: "空闲", running: "运行中…", success: "成功", failed: "失败" };
+
+    function render(s) {
+      const pill = document.getElementById("statePill");
+      pill.className = "pill " + s.state;
+      pill.textContent = STATE_LABEL[s.state] || s.state;
+      document.getElementById("runBtn").disabled = (s.state === "running");
+      const meta = [];
+      if (s.started_at) meta.push("开始：" + s.started_at);
+      if (s.finished_at) meta.push("结束：" + s.finished_at);
+      document.getElementById("meta").textContent = meta.join("　·　");
+      document.getElementById("log").textContent = s.log_tail || "（暂无运行日志）";
+    }
+
+    async function poll() {
+      try {
+        const r = await fetch("/status");
+        if (r.ok) render(await r.json());
+      } catch (e) { /* ignore transient errors */ }
+    }
+
+    async function startRun() {
+      document.getElementById("runBtn").disabled = true;
+      await fetch("/run", { method: "POST" });
+      poll();
+    }
+
+    async function sendLatest() {
+      const r = await fetch("/send-latest", { method: "POST" });
+      const j = await r.json();
+      alert(j.ok ? "已重新发送最新表格。" : "发送失败，请检查日志或 SMTP 设置。");
+      poll();
+    }
+
+    if (new URLSearchParams(location.search).get("saved")) {
+      const el = document.getElementById("saved");
+      el.style.display = "block";
+      setTimeout(() => { el.style.display = "none"; }, 3000);
+      history.replaceState({}, "", "/");
+    }
+
+    poll();
+    setInterval(poll, 3000);
+  </script>
+</body>
+</html>

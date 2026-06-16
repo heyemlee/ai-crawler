@@ -34,13 +34,23 @@ browser = [
 mcp = [
   "mcp>=1.2",
 ]
+web = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "jinja2>=3.1",
+  "python-multipart>=0.0.9",
+]
 
 [project.scripts]
 projectintel = "bay_area_projectintel.cli:app"
 projectintel-mcp = "bay_area_projectintel.mcp.server:main"
+projectintel-web = "bay_area_projectintel.web.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"bay_area_projectintel.web" = ["templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
