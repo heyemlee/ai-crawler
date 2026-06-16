@@ -24,8 +24,17 @@ RUN pip install ".[web]"
 COPY deploy/railway-run.sh /app/deploy/railway-run.sh
 RUN chmod +x /app/deploy/railway-run.sh
 
-# All mutable state (SQLite DB, HTTP cache, CSLB CSV, Excel, operator config) must live
-# on the Railway volume mounted at /data — point the PROJECTINTEL_* path env vars there.
-# Without a volume the container filesystem is ephemeral and every run starts cold.
+# All mutable state defaults to /data so deployment needs ZERO path config — just mount
+# a Railway volume at /data and these persist. (Without a volume it still runs, just
+# non-persistently: each run starts cold.) These ENV defaults apply only inside the
+# image, so local development is unaffected. The operator then only sets a few secrets:
+# OPERATOR_PASSWORD, PROJECTINTEL_SMTP_USER / PROJECTINTEL_SMTP_PASSWORD, PROJECTINTEL_EMAIL_TO.
+ENV PROJECTINTEL_DB_PATH=/data/projectintel.sqlite3 \
+    PROJECTINTEL_CACHE_DIR=/data/cache \
+    PROJECTINTEL_CSLB_MASTER_CSV=/data/cslb/MasterLicenseData.csv \
+    PROJECTINTEL_LATEST_EXCEL_PATH=/data/latest-leads.xlsx \
+    PROJECTINTEL_NOTIFY_LOG_PATH=/data/notify.log \
+    PROJECTINTEL_OUT=/data/leads.xlsx
+
 # The web app binds $PORT (Railway sets it; defaults to 8000 locally).
 CMD ["projectintel-web"]

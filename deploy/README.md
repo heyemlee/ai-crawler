@@ -12,6 +12,31 @@ the main README.
 Files: [`../Dockerfile`](../Dockerfile), [`../railway.toml`](../railway.toml),
 [`railway-run.sh`](railway-run.sh) (cron entrypoint), [`../.dockerignore`](../.dockerignore).
 
+---
+
+## 最简部署（5 步，全在 Railway 网页里点）
+
+部署只做一次，由你完成；之后操作者只用浏览器。所有路径已写死在镜像里，所以你**只需填 4 个值**。
+
+1. **新建项目**：Railway → New Project → **Deploy from GitHub repo** → 选 `heyemlee/ai-crawler`。
+2. **加存储**：进服务 → Variables 旁边的 **Volume** → New Volume → Mount Path 填 **`/data`**。
+3. **填 4 个变量**（Variables 标签，Raw Editor 粘贴即可）：
+   ```
+   OPERATOR_PASSWORD=自己定一个访问密码
+   PROJECTINTEL_SMTP_USER=ywu1286@gmail.com
+   PROJECTINTEL_SMTP_PASSWORD=你的Gmail应用专用密码
+   PROJECTINTEL_EMAIL_TO=默认收件人@example.com
+   ```
+4. **拿网址**：Settings → Networking → **Generate Domain**。
+5. **发给操作者**：把「网址 + 访问密码」发过去。他们开浏览器、输密码、点「开始跑批」就行。
+
+> Gmail 应用专用密码：https://myaccount.google.com/apppasswords （先开两步验证）。没有它邮件发不出去。
+> 想让分类更准，可再加一个 `DEEPSEEK_API_KEY`（可选）。
+
+下面是详细参考（含 CLI 部署、无人值守 cron、灌历史数据）。
+
+---
+
 ## 1. The one thing you must not skip: a persistent volume
 
 Railway's container filesystem is **ephemeral** — wiped on each deploy. The pipeline
@@ -41,18 +66,13 @@ runs. Create one volume mounted at **`/data`** and point the state env vars ther
 | `PROJECTINTEL_EMAIL_TO` | optional | Seeds the default recipient; the operator can change it in the UI. |
 | `SAM_API_KEY` | optional | Only if you add SAM.gov sources. |
 
-**State paths — point everything at the `/data` volume**
+**State paths — already baked into the image (no need to set these)**
 
-```
-PROJECTINTEL_DB_PATH=/data/projectintel.sqlite3
-PROJECTINTEL_CACHE_DIR=/data/cache
-PROJECTINTEL_CSLB_MASTER_CSV=/data/cslb/MasterLicenseData.csv
-PROJECTINTEL_LATEST_EXCEL_PATH=/data/latest-leads.xlsx
-PROJECTINTEL_NOTIFY_LOG_PATH=/data/notify.log
-PROJECTINTEL_OUT=/data/leads.xlsx
-```
-
-`PORT` is set by Railway automatically — the app binds it. Don't hardcode it.
+The Dockerfile sets `PROJECTINTEL_DB_PATH`, `PROJECTINTEL_CACHE_DIR`,
+`PROJECTINTEL_CSLB_MASTER_CSV`, `PROJECTINTEL_LATEST_EXCEL_PATH`,
+`PROJECTINTEL_NOTIFY_LOG_PATH`, and `PROJECTINTEL_OUT` all under `/data`. Just mount
+the volume at `/data` (step 1) and they persist — override only if you want a
+different layout. `PORT` is set by Railway automatically; the app binds it.
 
 ## 3. Deploy
 
