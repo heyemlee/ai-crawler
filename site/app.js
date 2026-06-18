@@ -14,7 +14,7 @@ const CAT_LABEL = {
 };
 
 const PAGE_SIZE = 50;
-const state = { data: null, base: [], filtered: [], page: 1, week: "", cat: "", city: "", contact: "", onlyNew: false, q: "" };
+const state = { data: null, base: [], filtered: [], page: 1, week: "", cat: "", city: "", contact: "yes", q: "" };
 
 function esc(s) {
   return String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -126,7 +126,6 @@ function bindControls() {
   document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); state.page = 1; applyFilters(); });
   document.getElementById("city").addEventListener("change", (e) => { state.city = e.target.value; state.page = 1; applyFilters(); });
   document.getElementById("contact").addEventListener("change", (e) => { state.contact = e.target.value; state.page = 1; applyFilters(); });
-  document.getElementById("onlyNew").addEventListener("change", (e) => { state.onlyNew = e.target.checked; state.page = 1; applyFilters(); });
 }
 
 function applyFilters() {
@@ -134,7 +133,6 @@ function applyFilters() {
   state.filtered = state.base.filter((l) => {
     if (state.cat && l.category !== state.cat) return false;
     if (state.city && l.city !== state.city) return false;
-    if (state.onlyNew && !l.is_new) return false;
     if (state.contact === "yes" && !hasContact(l)) return false;
     if (state.contact === "no" && hasContact(l)) return false;
     if (q && !(`${l.company} ${l.address} ${l.desc} ${l.email}`.toLowerCase().includes(q))) return false;
