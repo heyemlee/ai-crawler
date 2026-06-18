@@ -16,6 +16,7 @@ from bay_area_projectintel.db import Database
 from bay_area_projectintel.enrichment import EnrichmentPipeline
 from bay_area_projectintel.enrichment.cslb import download_master_csv
 from bay_area_projectintel.export.excel import export_excel
+from bay_area_projectintel.export.web_json import export_web_json
 from bay_area_projectintel.llm.client import DeepSeekClassifier
 from bay_area_projectintel.models import Category
 from bay_area_projectintel.notify import (
@@ -233,6 +234,20 @@ def export(
         latest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(out, latest)
         console.print(f"Updated latest pointer: {latest}")
+
+
+@app.command(name="export-web")
+def export_web(
+    out: Path = typer.Option(Path("site/data/leads.json"), "--out", "-o"),
+    new_window_days: int = typer.Option(7, "--new-window-days", help="first_seen within N days counts as newly crawled."),
+) -> None:
+    """Export leads as JSON for the static viewer page (Cloudflare/Vercel)."""
+    db, _ = _runtime()
+    stats = export_web_json(db, out, new_window_days=new_window_days)
+    console.print(
+        f"Wrote {stats['total']} leads to {stats['out']} "
+        f"({stats['with_contact']} with contact, {stats['new_count']} new)."
+    )
 
 
 @app.command()

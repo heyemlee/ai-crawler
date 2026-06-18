@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <title>线索数据看板</title>
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --fg:#e2e8f0; --muted:#94a3b8;
+            --accent:#3b82f6; --ok:#22c55e; --new:#f59e0b; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg); line-height:1.5;
+           font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 80px; }
+    h1 { font-size: 20px; margin: 4px 0; }
+    .stats { display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:13px; margin-bottom:16px; }
+    .stats b { color:var(--fg); font-size:15px; }
+    .stats .new { color:var(--new); }
+    .controls { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px; }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .chip { border:1px solid var(--line); background:#0b1220; color:var(--fg); border-radius:999px;
+            padding:6px 12px; font-size:13px; cursor:pointer; user-select:none; }
+    .chip.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+    .chip .n { color:var(--muted); margin-left:4px; }
+    .chip.active .n { color:#dbeafe; }
+    .chip .nb { color:var(--new); margin-left:4px; }
+    .row2 { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    input[type=text], select { padding:9px 11px; border-radius:8px; border:1px solid var(--line);
+            background:#0b1220; color:var(--fg); font:inherit; }
+    #q { flex:1; min-width:220px; }
+    label.toggle { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); cursor:pointer; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { text-align:left; color:var(--muted); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--line);
+               position:sticky; top:0; background:var(--bg); }
+    tbody td { padding:9px 10px; border-bottom:1px solid #233048; vertical-align:top; }
+    tbody tr.new { background: rgba(245,158,11,.06); }
+    .badge { display:inline-block; background:rgba(245,158,11,.18); color:var(--new); font-size:11px; font-weight:700;
+             border-radius:5px; padding:1px 6px; }
+    .cat { display:inline-block; background:#0b1220; border:1px solid var(--line); border-radius:5px; padding:1px 7px; font-size:12px; white-space:nowrap; }
+    .muted { color:var(--muted); }
+    .contact a { color:var(--accent); text-decoration:none; cursor:pointer; }
+    .desc { max-width:340px; }
+    .pager { display:flex; gap:10px; align-items:center; justify-content:center; margin-top:16px; color:var(--muted); font-size:13px; }
+    .pager button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--fg);
+            border-radius:8px; padding:7px 14px; cursor:pointer; }
+    .pager button:disabled { opacity:.4; cursor:not-allowed; }
+    .empty { text-align:center; color:var(--muted); padding:40px; }
+    a.src { color:var(--accent); text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🏗️ 线索数据看板</h1>
+    <div class="stats" id="stats">加载中…</div>
+
+    <div class="controls">
+      <div class="chips" id="catChips"></div>
+      <div class="row2">
+        <input type="text" id="q" placeholder="搜索 公司 / 地址 / 描述 / 邮箱…" />
+        <select id="city"><option value="">全部城市</option></select>
+        <select id="contact">
+          <option value="">联系方式：全部</option>
+          <option value="yes">有联系方式</option>
+          <option value="no">待补全</option>
+        </select>
+        <label class="toggle"><input type="checkbox" id="onlyNew" /> 只看新增 🆕</label>
+      </div>
+    </div>
+
+    <div id="tableWrap"></div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
