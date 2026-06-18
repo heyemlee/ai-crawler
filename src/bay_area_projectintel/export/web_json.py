@@ -25,12 +25,29 @@ def _val(row: Any, key: str) -> Any:
         return None
 
 
+def _week_info(first_seen: str) -> tuple[str, str, str]:
+    """Map a YYYY-MM-DD date to its ISO week: (key, monday_iso, label).
+
+    Weeks are the natural crawl cohort — one weekly run lands in one bucket.
+    """
+    try:
+        d = date.fromisoformat(first_seen[:10])
+    except ValueError:
+        return "unknown", "", "未知日期"
+    iso = d.isocalendar()
+    monday = date.fromisocalendar(iso[0], iso[1], 1)
+    sunday = date.fromisocalendar(iso[0], iso[1], 7)
+    label = f"{monday.month}/{monday.day}–{sunday.month}/{sunday.day}"
+    return f"{iso[0]}-W{iso[1]:02d}", monday.isoformat(), label
+
+
 def build_web_data(rows: Iterable[Any], *, today: str | None = None, new_window_days: int = 7) -> dict[str, Any]:
     today = today or date.today().isoformat()
     new_since = (date.fromisoformat(today) - timedelta(days=new_window_days)).isoformat()
 
     leads: list[dict[str, Any]] = []
     cat_counts: dict[str, dict[str, int]] = {}
+    week_info: dict[str, dict[str, Any]] = {}
     cities: set[str] = set()
     with_contact = 0
     new_count = 0
@@ -38,6 +55,10 @@ def build_web_data(rows: Iterable[Any], *, today: str | None = None, new_window_
     for row in rows:
         first_seen = (str(_val(row, "first_seen") or ""))[:10]
         is_new = bool(first_seen) and first_seen >= new_since
+
+        week_key, week_start, week_label = _week_info(first_seen)
+        wb = week_info.setdefault(week_key, {"label": week_label, "start": week_start, "count": 0})
+        wb["count"] += 1
         email = _val(row, "email") or ""
         phone = _val(row, "phone") or ""
         if email or phone:
@@ -75,6 +96,7 @@ def build_web_data(rows: Iterable[Any], *, today: str | None = None, new_window_
                 "url": _val(row, "source_url") or "",
                 "license": _val(row, "license_number") or "",
                 "is_new": is_new,
+                "week": week_key,
             }
         )
 
@@ -85,6 +107,11 @@ def build_web_data(rows: Iterable[Any], *, today: str | None = None, new_window_
         {"key": key, "count": val["count"], "new": val["new"]}
         for key, val in sorted(cat_counts.items())
     ]
+    # Weeks newest-first; an "unknown" bucket (no first_seen) sorts last via empty start.
+    weeks = [
+        {"key": key, "label": val["label"], "count": val["count"]}
+        for key, val in sorted(week_info.items(), key=lambda kv: kv[1]["start"], reverse=True)
+    ]
     return {
         "generated_at": today,
         "new_since": new_since,
@@ -93,6 +120,7 @@ def build_web_data(rows: Iterable[Any], *, today: str | None = None, new_window_
         "with_contact": with_contact,
         "new_count": new_count,
         "categories": categories,
+        "weeks": weeks,
         "cities": sorted(cities),
         "leads": leads,
     }

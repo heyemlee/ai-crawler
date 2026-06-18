@@ -30,6 +30,10 @@ def test_build_web_data_flags_new_and_counts():
     assert d["leads"][0]["company"] == "A"
     assert d["leads"][0]["is_new"] is True
     assert d["leads"][1]["is_new"] is False
+    # Weekly buckets: two distinct weeks, newest first, each lead tagged with its week.
+    assert len(d["weeks"]) == 2
+    assert d["weeks"][0]["count"] == 1  # the June (newest) week
+    assert all("week" in lead for lead in d["leads"])
 
 
 def test_description_is_capped():

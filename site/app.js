@@ -1,5 +1,6 @@
 // Static leads viewer — reads ./data/leads.json and renders a filterable,
-// paginated, category-partitioned table with a 🆕 badge for newly crawled rows.
+// paginated table partitioned by WEEK (one weekly crawl = one period), then by
+// category, with a 🆕 badge for newly crawled rows.
 
 const CAT_LABEL = {
   PUBLIC_WORKS: "公共工程",
@@ -13,11 +14,13 @@ const CAT_LABEL = {
 };
 
 const PAGE_SIZE = 50;
-const state = { data: null, filtered: [], page: 1, cat: "", city: "", contact: "", onlyNew: false, q: "" };
+const state = { data: null, base: [], filtered: [], page: 1, week: "", cat: "", city: "", contact: "", onlyNew: false, q: "" };
 
 function esc(s) {
   return String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
+
+function hasContact(l) { return !!(l.email || l.phone); }
 
 async function load() {
   try {
@@ -27,30 +30,73 @@ async function load() {
     document.getElementById("stats").textContent = "无法加载 data/leads.json";
     return;
   }
-  renderStats();
-  renderChips();
+  const weeks = state.data.weeks || [];
+  state.week = weeks.length ? weeks[0].key : ""; // default: the latest period
+  renderWeeks();
   renderCities();
   bindControls();
+  refreshBase();
+}
+
+// Recompute the week-scoped base set, then re-render everything that depends on it.
+function refreshBase() {
+  state.base = state.week ? state.data.leads.filter((l) => l.week === state.week) : state.data.leads;
+  renderStats();
+  renderChips();
   applyFilters();
 }
 
+function renderWeeks() {
+  const sel = document.getElementById("week");
+  const weeks = state.data.weeks || [];
+  sel.innerHTML =
+    `<option value="">全部周期 · ${state.data.total.toLocaleString()} 条</option>` +
+    weeks
+      .map(
+        (w, i) =>
+          `<option value="${esc(w.key)}" ${w.key === state.week ? "selected" : ""}>` +
+          `${esc(w.label)} · ${w.count.toLocaleString()} 条${i === 0 ? "（最新）" : ""}</option>`
+      )
+      .join("");
+}
+
+function renderCities() {
+  const sel = document.getElementById("city");
+  state.data.cities.forEach((c) => {
+    const o = document.createElement("option");
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+}
+
 function renderStats() {
-  const d = state.data;
-  const cov = d.total ? Math.round((d.with_contact / d.total) * 100) : 0;
+  const base = state.base;
+  const withC = base.filter(hasContact).length;
+  const cov = base.length ? Math.round((withC / base.length) * 100) : 0;
+  const newC = base.filter((l) => l.is_new).length;
+  const wk = state.week ? (state.data.weeks.find((w) => w.key === state.week) || {}).label : "全部周期";
   document.getElementById("stats").innerHTML =
-    `<span>线索总数 <b>${d.total.toLocaleString()}</b></span>` +
-    `<span>有联系方式 <b>${d.with_contact.toLocaleString()}</b>（${cov}%）</span>` +
-    `<span class="new">本期新增 🆕 <b>${d.new_count.toLocaleString()}</b></span>` +
-    `<span>数据更新 ${d.generated_at}</span>` +
-    `<span class="muted">（first_seen ≥ ${d.new_since} 记为新增）</span>`;
+    `<span>周期 <b>${esc(wk || state.week)}</b></span>` +
+    `<span>线索 <b>${base.length.toLocaleString()}</b></span>` +
+    `<span>有联系方式 <b>${withC.toLocaleString()}</b>（${cov}%）</span>` +
+    `<span class="new">新增 🆕 <b>${newC.toLocaleString()}</b></span>` +
+    `<span class="muted">数据更新 ${state.data.generated_at}</span>`;
 }
 
 function renderChips() {
+  const counts = {};
+  state.base.forEach((l) => {
+    const c = counts[l.category] || (counts[l.category] = { count: 0, new: 0 });
+    c.count++;
+    if (l.is_new) c.new++;
+  });
+  const arr = Object.keys(counts)
+    .map((k) => ({ key: k, count: counts[k].count, new: counts[k].new, label: CAT_LABEL[k] || k }))
+    .sort((a, b) => b.count - a.count);
+  const all = { key: "", count: state.base.length, new: state.base.filter((l) => l.is_new).length, label: "全部" };
+  const chips = [all].concat(arr);
+
   const wrap = document.getElementById("catChips");
-  const cats = state.data.categories.slice().sort((a, b) => b.count - a.count);
-  const chips = [{ key: "", count: state.data.total, new: state.data.new_count, label: "全部" }].concat(
-    cats.map((c) => ({ key: c.key, count: c.count, new: c.new, label: CAT_LABEL[c.key] || c.key }))
-  );
   wrap.innerHTML = chips
     .map(
       (c) =>
@@ -64,23 +110,19 @@ function renderChips() {
     el.addEventListener("click", () => {
       state.cat = el.dataset.cat;
       state.page = 1;
-      renderChips();
+      wrap.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.dataset.cat === state.cat));
       applyFilters();
     })
   );
 }
 
-function renderCities() {
-  const sel = document.getElementById("city");
-  state.data.cities.forEach((c) => {
-    const o = document.createElement("option");
-    o.value = c;
-    o.textContent = c;
-    sel.appendChild(o);
-  });
-}
-
 function bindControls() {
+  document.getElementById("week").addEventListener("change", (e) => {
+    state.week = e.target.value;
+    state.cat = "";
+    state.page = 1;
+    refreshBase();
+  });
   document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); state.page = 1; applyFilters(); });
   document.getElementById("city").addEventListener("change", (e) => { state.city = e.target.value; state.page = 1; applyFilters(); });
   document.getElementById("contact").addEventListener("change", (e) => { state.contact = e.target.value; state.page = 1; applyFilters(); });
@@ -89,12 +131,12 @@ function bindControls() {
 
 function applyFilters() {
   const q = state.q;
-  state.filtered = state.data.leads.filter((l) => {
+  state.filtered = state.base.filter((l) => {
     if (state.cat && l.category !== state.cat) return false;
     if (state.city && l.city !== state.city) return false;
     if (state.onlyNew && !l.is_new) return false;
-    if (state.contact === "yes" && !(l.email || l.phone)) return false;
-    if (state.contact === "no" && (l.email || l.phone)) return false;
+    if (state.contact === "yes" && !hasContact(l)) return false;
+    if (state.contact === "no" && hasContact(l)) return false;
     if (q && !(`${l.company} ${l.address} ${l.desc} ${l.email}`.toLowerCase().includes(q))) return false;
     return true;
   });
