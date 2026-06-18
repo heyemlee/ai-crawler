@@ -37,12 +37,23 @@ going through the public repo. You get a `https://leads-viewer.pages.dev` URL.
 
 Or in one step each week: [`./publish-site.sh`](publish-site.sh) (export + deploy).
 
-## 3. Protect it with Cloudflare Access (free, ~2 min)
+## 3. Protect it with a password (free, works on *.pages.dev)
 
-Cloudflare dashboard → **Zero Trust → Access → Applications → Add application →
-Self-hosted** → domain = your `leads-viewer.pages.dev` → add a policy: *Allow* →
-*Emails* (list your team's emails) or *Emails ending in* `@ravv.com`. Now opening
-the page requires an email one-time-code — randoms with the link are blocked.
+Cloudflare **Access does NOT enforce on the free `*.pages.dev` domain** (it only
+protects custom domains in your account). Instead, [`../site/functions/_middleware.js`](../site/functions/_middleware.js)
+adds edge HTTP Basic Auth over every request (including `data/leads.json`),
+fail-closed.
+
+Set the password once, then deploy:
+
+1. Cloudflare dashboard → Workers & Pages → **leads-viewer → Settings →
+   Variables and Secrets** → add `SITE_PASSWORD` = a password of your choice
+   (Production). (Or: `wrangler pages secret put SITE_PASSWORD --project-name leads-viewer`.)
+2. Deploy (step 2 above). Now the page prompts for a password — any username, that
+   password — and nothing is served without it. Share the URL + password with your team.
+
+For per-person email login instead of one shared password, you'd need a **custom
+domain** on a Cloudflare zone you control, then Cloudflare Access on that domain.
 
 ## 4. Weekly update
 
